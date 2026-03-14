@@ -1,0 +1,184 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+game:GetService("UserInputService")
+game:GetService("ContextActionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local RemoteEvents = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("RemoteEvents")
+local HyperMovEvent = RemoteEvents:WaitForChild("GTHyperMovEvent")
+local CustomSpeedEvent = RemoteEvents:WaitForChild("GTCustomSpeedEvent")
+local LocalPlayer = Players.LocalPlayer
+
+local Character
+local RootPart
+local Humanoid
+local Animator
+local Tool
+local OwnerValue
+local GlitchModSpeed
+local SpeedInfoLabel
+local SpeedBox
+local HyperFlyIdleAnim
+local BodyVelocity
+local BodyGyro
+local HeartbeatConn
+local IsCoolingDown = false
+local IsSpeedCooldown = false
+local IsEquipped = false
+local LastInput = ""
+
+local Camera = game.Workspace.Camera
+
+local function GetMoveDirection()
+	if Humanoid.MoveDirection == Vector3.new(0, 0, 0) then
+		return Humanoid.MoveDirection
+	else
+		local camCFrame = Camera.CFrame
+		local camPos = Camera.CFrame.Position
+		local lookX = Camera.CFrame.LookVector.X
+		local lookZ = Camera.CFrame.LookVector.Z
+		local direction = (camCFrame * CFrame.new((CFrame.new(camPos, camPos + Vector3.new(lookX, 0, lookZ)):VectorToObjectSpace(Humanoid.MoveDirection)))).Position - Camera.CFrame.Position
+		if direction == Vector3.new() then
+			return direction
+		else
+			return direction.unit
+		end
+	end
+end
+
+local function SetupTool()
+	OwnerValue = Tool:WaitForChild("Owner")
+	GlitchModSpeed = Tool:WaitForChild("GlitchModSpeed")
+	SpeedInfoLabel = GlitchModSpeed:WaitForChild("TheInfo2TXT")
+	SpeedBox = GlitchModSpeed:WaitForChild("SpeedBox")
+	HyperFlyIdleAnim = Animator:LoadAnimation(Tool:WaitForChild("HyperFlyIdle"))
+	BodyVelocity = Tool:WaitForChild("BodyVelocity")
+	BodyGyro = Tool:WaitForChild("BodyGyro")
+
+	SpeedInfoLabel.Text = "Current Speed: " .. (Character:GetAttribute("HyperMovSpeed") or 0)
+
+	Character:GetAttributeChangedSignal("HyperMovSpeed"):Connect(function()
+		SpeedInfoLabel.Text = "Current Speed: " .. (Character:GetAttribute("HyperMovSpeed") or 0)
+	end)
+
+	Character:GetAttributeChangedSignal("CanUseHMGui"):Connect(function()
+		GlitchModSpeed.Enabled = Character:GetAttribute("CanUseHMGui") and true or false
+	end)
+
+	SpeedBox.FocusLost:Connect(function(enterPressed)
+		if not Tool:GetAttribute("ToolTempDisable") and (not IsCoolingDown and (Tool.Enabled and (OwnerValue.Value and OwnerValue.Value.Parent))) then
+			if enterPressed and not IsSpeedCooldown then
+				local inputText = SpeedBox.Text
+				if tonumber(inputText) then
+					IsSpeedCooldown = true
+					CustomSpeedEvent:FireServer(GlitchModSpeed, tonumber(inputText))
+					task.wait(1)
+					IsSpeedCooldown = false
+				end
+			end
+		end
+	end)
+	
+	if not Tool:GetAttribute("ToolTempDisable") and (not IsCoolingDown and (Tool.Enabled and (OwnerValue.Value and OwnerValue.Value.Parent))) then
+		IsCoolingDown = true
+		IsEquipped = true
+		HyperFlyIdleAnim:Play()
+		if RootPart:FindFirstChild("Running") and RootPart:FindFirstChild("Running"):IsA("Sound") then
+			RootPart:FindFirstChild("Running").Volume = 0
+		end
+		BodyVelocity.Parent = RootPart
+		BodyGyro.Parent = RootPart
+		BodyVelocity.MaxForce = Vector3.new(1, 1, 1) * math.huge
+		BodyGyro.MaxTorque = Vector3.new(1, 1, 1) * math.huge
+		HyperMovEvent:FireServer(GlitchModSpeed, Tool, IsEquipped)
+		task.wait(0.1)
+		IsCoolingDown = false
+	end
+	
+	Tool.Equipped:Connect(function()
+		if not Tool:GetAttribute("ToolTempDisable") and (not IsCoolingDown and (Tool.Enabled and (OwnerValue.Value and OwnerValue.Value.Parent))) then
+			IsCoolingDown = true
+			IsEquipped = true
+			HyperFlyIdleAnim:Play()
+			if RootPart:FindFirstChild("Running") and RootPart:FindFirstChild("Running"):IsA("Sound") then
+				RootPart:FindFirstChild("Running").Volume = 0
+			end
+			BodyVelocity.Parent = RootPart
+			BodyGyro.Parent = RootPart
+			BodyVelocity.MaxForce = Vector3.new(1, 1, 1) * math.huge
+			BodyGyro.MaxTorque = Vector3.new(1, 1, 1) * math.huge
+			HyperMovEvent:FireServer(GlitchModSpeed, Tool, IsEquipped)
+			task.wait(0.1)
+			IsCoolingDown = false
+		end
+	end)
+
+	Tool.Unequipped:Connect(function()
+		IsCoolingDown = true
+		IsEquipped = false
+		HyperFlyIdleAnim:Stop()
+		LastInput = ""
+		if RootPart:FindFirstChild("Running") and RootPart:FindFirstChild("Running"):IsA("Sound") then
+			RootPart:FindFirstChild("Running").Volume = 0.65
+		end
+		BodyVelocity.Parent = script
+		BodyGyro.Parent = script
+		BodyVelocity.MaxForce = Vector3.new()
+		BodyGyro.MaxTorque = Vector3.new()
+		HyperMovEvent:FireServer(GlitchModSpeed, Tool, IsEquipped)
+		task.wait(0.1)
+		IsCoolingDown = false
+	end)
+
+	if HeartbeatConn then
+		HeartbeatConn:Disconnect()
+	end
+	HeartbeatConn = RunService.Heartbeat:Connect(function()
+		if RootPart and Humanoid and BodyVelocity and BodyGyro then
+			BodyGyro.CFrame = Camera.CFrame
+			TweenService:Create(BodyVelocity, TweenInfo.new(0.1, Enum.EasingStyle.Quad), {
+				Velocity = GetMoveDirection() * (Character:GetAttribute("HyperMovSpeed") or 0)
+			}):Play()
+		end
+	end)
+end
+
+local function OnCharacterAdded(newCharacter)
+	Character = newCharacter
+	IsCoolingDown = false
+	IsSpeedCooldown = false
+	IsEquipped = false
+	LastInput = ""
+	Tool = nil
+
+	RootPart = Character:WaitForChild("HumanoidRootPart")
+	Humanoid = Character:FindFirstChildOfClass("Humanoid")
+
+	repeat task.wait() until Humanoid:FindFirstChildOfClass("Animator")
+	Animator = Humanoid:FindFirstChildOfClass("Animator")
+
+	task.spawn(function()
+		while true do
+			task.wait()
+			local found = Character:FindFirstChild("Hyperspeed Movement")
+			if found then
+				Tool = found
+				SetupTool()
+				break
+			end
+		end
+	end)
+
+	LocalPlayer.CharacterRemoving:Once(function()
+		if HeartbeatConn then
+			HeartbeatConn:Disconnect()
+		end
+		if BodyVelocity then BodyVelocity:Destroy() end
+		if BodyGyro then BodyGyro:Destroy() end
+	end)
+end
+
+LocalPlayer.CharacterAdded:Connect(OnCharacterAdded)
+if LocalPlayer.Character then
+	OnCharacterAdded(LocalPlayer.Character)
+end
