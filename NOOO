@@ -47,8 +47,15 @@ local function GetMoveDirection()
 end
 
 local function SetupTool()
+	local PlayerGui = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+	if not (PlayerGui:FindFirstChild("GlitchMod") or Tool:FindFirstChild("GlitchMod")) then
+		print("NO!")
+		return
+	end
+
 	OwnerValue = Tool:WaitForChild("Owner")
-	GlitchModSpeed = Tool:WaitForChild("GlitchModSpeed")
+	local GUI= PlayerGui:FindFirstChild("GlitchMod") or Tool:WaitForChild("GlitchMod")
+	GlitchModSpeed = GUI
 	SpeedInfoLabel = GlitchModSpeed:WaitForChild("TheInfo2TXT")
 	SpeedBox = GlitchModSpeed:WaitForChild("SpeedBox")
 	HyperFlyIdleAnim = Animator:LoadAnimation(Tool:WaitForChild("HyperFlyIdle"))
@@ -78,7 +85,7 @@ local function SetupTool()
 			end
 		end
 	end)
-	
+
 	if not Tool:GetAttribute("ToolTempDisable") and (not IsCoolingDown and (Tool.Enabled and (OwnerValue.Value and OwnerValue.Value.Parent))) then
 		IsCoolingDown = true
 		IsEquipped = true
@@ -94,7 +101,7 @@ local function SetupTool()
 		task.wait(0.1)
 		IsCoolingDown = false
 	end
-	
+
 	Tool.Equipped:Connect(function()
 		if not Tool:GetAttribute("ToolTempDisable") and (not IsCoolingDown and (Tool.Enabled and (OwnerValue.Value and OwnerValue.Value.Parent))) then
 			IsCoolingDown = true
